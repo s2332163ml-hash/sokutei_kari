@@ -109,6 +109,19 @@
     color: var(--muted);
     background: var(--panel);
   }
+  .history-list { display: flex; flex-direction: column; gap: 12px; }
+  .history-card {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 16px;
+    border: 1.5px solid var(--line);
+    border-radius: 14px;
+    background: var(--panel);
+  }
+  .history-card h3, .history-card p { margin: 0; }
+  .history-average { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+  .history-average strong { color: var(--accent); font-size: 20px; }
 
   /* 入力フォーム */
   .field { display: flex; flex-direction: column; gap: 6px; }
@@ -246,11 +259,12 @@
   </div>
   <div class="body">
     <h2>今までの結果</h2>
-    <div class="placeholder">ここに過去の測定結果の一覧を表示します</div>
+    <div id="historyStatus" class="meta" role="status" aria-live="polite"></div>
+    <div id="historyList" class="history-list"></div>
+    <button class="btn secondary" id="historyReloadBtn" type="button">再読み込み</button>
   </div>
   <div class="footer">
     <button class="btn secondary" data-go="home">戻る</button>
-    <button class="btn primary" disabled>次へ</button>
   </div>
 </section>
 
@@ -471,6 +485,7 @@
 
     <h3>測定結果のアップロードについて</h3>
     <p>アップロードするデータには、施設名・所在地・部屋の用途や寸法・測定位置・測定結果・測定日時が含まれています。全国の保育施設の音環境をより良くするため、音響専門家が保育施設の音環境について現状を把握し、施設の比較を行ったり分析を行うことにデータは使われます。本目的以外では使用、公開はしません。</p>
+    <p>アップロードした結果はFirebaseに保存され、同じ端末の匿名ユーザーで保存した結果を「今までの結果」で確認できます。別の端末やブラウザーで保存した結果は表示されません。</p>
   </div>
   <div class="footer">
     <button class="btn secondary" id="helpBackBtn" type="button">前の画面に戻る</button>
@@ -543,9 +558,107 @@
     });
   }
 
-  // (2) アップロード処理。Firestore などへの保存をここに書きます(record が保存する内容)。
+  // (2) 測定結果をFirestoreへ保存します。
+  let anonymousSignInPromise = null;
+  function ensureAnonymousSignIn() {
+    if (auth.currentUser) return Promise.resolve(auth.currentUser);
+    if (!anonymousSignInPromise) {
+      anonymousSignInPromise = new Promise((resolve, reject) => {
+        let unsubscribe = () => {};
+        unsubscribe = auth.onAuthStateChanged(user => {
+          unsubscribe();
+          if (user) {
+            resolve(user);
+            return;
+          }
+          auth.signInAnonymously()
+            .then(credential => resolve(credential.user))
+            .catch(error => {
+              anonymousSignInPromise = null;
+              reject(error);
+            });
+        }, error => {
+          unsubscribe();
+          anonymousSignInPromise = null;
+          reject(error);
+        });
+      });
+    }
+    return anonymousSignInPromise;
+  }
+
   async function uploadResult(record) {
-    await new Promise(r => setTimeout(r, 1200)); // ← 仮の待ち時間。保存処理に置き換え
+    const user = await ensureAnonymousSignIn();
+    await db.collection("measurements").add({
+      ...record,
+      ownerUid: user.uid,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+  }
+
+  async function loadHistory() {
+    const status = $("historyStatus");
+    const list = $("historyList");
+    status.textContent = "保存した結果を読み込み中…";
+    list.replaceChildren();
+
+    try {
+      const user = await ensureAnonymousSignIn();
+      const snapshot = await db.collection("measurements")
+        .where("ownerUid", "==", user.uid)
+        .get();
+      const records = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      records.sort((a, b) => {
+        const aTime = a.createdAt && typeof a.createdAt.toMillis === "function" ? a.createdAt.toMillis() : Date.parse(a.measuredAt) || 0;
+        const bTime = b.createdAt && typeof b.createdAt.toMillis === "function" ? b.createdAt.toMillis() : Date.parse(b.measuredAt) || 0;
+        return bTime - aTime;
+      });
+
+      if (records.length === 0) {
+        status.textContent = "この端末では、まだアップロード済みの測定結果がありません。";
+        return;
+      }
+
+      status.textContent = `${records.length}件の測定結果`;
+      records.forEach(record => list.appendChild(createHistoryCard(record)));
+    } catch (error) {
+      console.error(error);
+      status.textContent = "結果を読み込めませんでした。通信状況とFirestoreのルールを確認して、再読み込みしてください。";
+    }
+  }
+
+  function createHistoryCard(record) {
+    const card = document.createElement("article");
+    card.className = "history-card";
+
+    const title = document.createElement("h3");
+    title.textContent = record.facility || "施設名なし";
+    card.appendChild(title);
+
+    const location = document.createElement("p");
+    location.textContent = `${record.pref || ""}${record.city || ""} / ${record.use || "用途なし"}`;
+    card.appendChild(location);
+
+    const dimensions = document.createElement("p");
+    dimensions.textContent = `部屋: ${fmt(record.length)}×${fmt(record.width)}×${fmt(record.height)} m`;
+    card.appendChild(dimensions);
+
+    const average = document.createElement("p");
+    average.className = "history-average";
+    const averageLabel = document.createElement("span");
+    averageLabel.textContent = "平均残響時間";
+    const averageValue = document.createElement("strong");
+    averageValue.textContent = `${fmt(record.result && record.result.average)} 秒`;
+    average.append(averageLabel, averageValue);
+    card.appendChild(average);
+
+    const date = document.createElement("p");
+    date.className = "meta";
+    const measuredAt = new Date(record.measuredAt);
+    date.textContent = `測定日時: ${Number.isNaN(measuredAt.getTime()) ? "不明" : measuredAt.toLocaleString("ja-JP")}`;
+    card.appendChild(date);
+
+    return card;
   }
 
   /* ---------- 状態 ---------- */
@@ -574,6 +687,7 @@
     if (id === "position") drawPosition();
     if (id === "measuring") startMeasurement();
     if (id === "result") renderResult();
+    if (id === "history") loadHistory();
   }
 
   window.addEventListener("hashchange", () => show(location.hash.slice(1)));
@@ -581,6 +695,7 @@
   $("helpBackBtn").addEventListener("click", () => {
     location.hash = helpReturnTo;
   });
+  $("historyReloadBtn").addEventListener("click", loadHistory);
 
   document.addEventListener("click", e => {
     const go = e.target.closest("[data-go]");

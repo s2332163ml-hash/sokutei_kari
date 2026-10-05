@@ -286,6 +286,7 @@
   </div>
   <div class="body">
     <h2>施設・部屋の情報</h2>
+    <button class="btn secondary" id="fillSampleBtn" type="button">確認用：サンプル情報を入力</button>
 
     <div class="section-title">施設</div>
     <label class="field"><span>施設名</span>
@@ -319,13 +320,13 @@
 
     <div class="grid3">
       <label class="field"><span>縦 (m)</span>
-        <input id="len" type="number" inputmode="decimal" step="0.01" min="0" placeholder="例:8.0">
+        <input id="len" type="text" inputmode="decimal" placeholder="例:8.0">
       </label>
       <label class="field"><span>横 (m)</span>
-        <input id="wid" type="number" inputmode="decimal" step="0.01" min="0" placeholder="例:6.0">
+        <input id="wid" type="text" inputmode="decimal" placeholder="例:6.0">
       </label>
       <label class="field"><span>高さ (m)</span>
-        <input id="hei" type="number" inputmode="decimal" step="0.01" min="0" placeholder="例:2.7">
+        <input id="hei" type="text" inputmode="decimal" placeholder="例:2.7">
       </label>
     </div>
     <div class="hint">寸法はメートル単位で入力してください(小数可)。</div>
@@ -461,8 +462,15 @@
   </div>
   <div class="body">
     <h2>ヘルプ</h2>
-    <p>「測定を始める」から残響時間の測定ができます。測定した結果は「今までの結果」で確認できます。</p>
-    <div class="placeholder">ここに詳しい使い方を書きます</div>
+    <p>「測定を始める」から部屋の響きを測定できます。</p>
+    <h3>残響時間とは</h3>
+    <p>音が止まってから、部屋に残った音が元の大きさより60デシベル小さくなるまでの時間です。その場所での音の響きやすさが分かります。</p>
+
+    <h3>保育室で測る理由</h3>
+    <p>部屋が響きすぎると声が聞き取りにくくなり、子どもも職員も疲れやすくなります。特に、子どもにとっては発育に関わることもあるため、保育施設の音環境をより良く整えることは重要です。</p>
+
+    <h3>測定結果のアップロードについて</h3>
+    <p>アップロードするデータには、施設名・所在地・部屋の用途や寸法・測定位置・測定結果・測定日時が含まれています。全国の保育施設の音環境をより良くするため、音響専門家が保育施設の音環境について現状を把握し、施設の比較を行ったり分析を行うことにデータは使われます。本目的以外では使用、公開はしません。</p>
   </div>
 </section>
 
@@ -478,7 +486,28 @@
   </div>
 </div>
 
+
+<!-- 追加分 -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+
+
 <script>
+  <!-- 追加分 -->
+  const firebaseConfig = {
+  apiKey: "AIzaSyBQn20upL93mukJ5kEgvLNKdkdypi0ovYw",
+  authDomain: "sokutei-5ca0e.firebaseapp.com",
+  projectId: "sokutei-5ca0e",
+  storageBucket: "sokutei-5ca0e.firebasestorage.app",
+  messagingSenderId: "1005888887526",
+  appId: "1:1005888887526:web:8c253be8372389eaa2f927"
+};
+
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
+  const auth = firebase.auth();
+
   const $ = id => document.getElementById(id);
   const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const fmt = n => (Math.round(n * 100) / 100).toString();
@@ -605,6 +634,24 @@
 
   $("use").addEventListener("change", () => { $("useOtherWrap").hidden = $("use").value !== "その他"; });
 
+  function normalizeDimensionInput(input) {
+    const normalized = input.value
+      .replace(/[０-９]/g, digit => String.fromCharCode(digit.charCodeAt(0) - 0xfee0))
+      .replace(/．/g, ".");
+    let hasDecimalPoint = false;
+    input.value = normalized.replace(/[^\d.]/g, "").replace(/\./g, point => {
+      if (hasDecimalPoint) return "";
+      hasDecimalPoint = true;
+      return point;
+    });
+  }
+
+  ["len", "wid", "hei"].forEach(id => {
+    const input = $(id);
+    input.addEventListener("compositionend", () => normalizeDimensionInput(input));
+    input.addEventListener("blur", () => normalizeDimensionInput(input));
+  });
+
   document.querySelectorAll("#info input, #info select").forEach(el =>
     el.addEventListener("input", () => { $("nextInfo").disabled = true; appData.ready = false; })
   );
@@ -638,7 +685,7 @@
     const city = $("city").value.trim();
     let use = $("use").value;
     if (use === "その他") use = $("useOther").value.trim();
-    const L = parseFloat($("len").value), W = parseFloat($("wid").value), H = parseFloat($("hei").value);
+    const L = Number($("len").value), W = Number($("wid").value), H = Number($("hei").value);
 
     let msg = "";
     if (!facility) msg = "施設名を入力してください。";
@@ -662,6 +709,19 @@
     $("planArea").hidden = false;
     $("nextInfo").disabled = false;
     $("planArea").scrollIntoView({ behavior: "smooth", block: "nearest" });
+  });
+
+  $("fillSampleBtn").addEventListener("click", () => {
+    $("facility").value = "テスト保育園";
+    $("pref").value = "千葉県";
+    $("city").value = "習志野市";
+    $("use").value = "保育室";
+    $("useOther").value = "";
+    $("useOtherWrap").hidden = true;
+    $("len").value = "8.0";
+    $("wid").value = "6.0";
+    $("hei").value = "2.7";
+    $("drawBtn").click();
   });
 
   /* ---------- 注意事項チェックリスト ---------- */

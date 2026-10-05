@@ -472,6 +472,9 @@
     <h3>測定結果のアップロードについて</h3>
     <p>アップロードするデータには、施設名・所在地・部屋の用途や寸法・測定位置・測定結果・測定日時が含まれています。全国の保育施設の音環境をより良くするため、音響専門家が保育施設の音環境について現状を把握し、施設の比較を行ったり分析を行うことにデータは使われます。本目的以外では使用、公開はしません。</p>
   </div>
+  <div class="footer">
+    <button class="btn secondary" id="helpBackBtn" type="button">前の画面に戻る</button>
+  </div>
 </section>
 
 <!-- 確認ダイアログ -->
@@ -554,6 +557,7 @@
   const screens = ["home", "history", "overview", "info", "checklist", "position", "guide", "measuring", "result", "help"];
   const needsData = ["checklist", "position", "guide", "measuring", "result"];
   let current = "home";
+  let helpReturnTo = "home";
   let ctrl = null;
 
   /* ---------- 画面遷移 ---------- */
@@ -562,6 +566,7 @@
       id = "home";
       history.replaceState(null, "", "#home");
     }
+    if (id === "help" && current !== "help") helpReturnTo = current;
     if (current === "measuring" && id !== "measuring" && ctrl) ctrl.cancelled = true;
     current = id;
     document.querySelectorAll(".screen").forEach(s => s.classList.toggle("active", s.id === id));
@@ -572,6 +577,10 @@
   }
 
   window.addEventListener("hashchange", () => show(location.hash.slice(1)));
+
+  $("helpBackBtn").addEventListener("click", () => {
+    location.hash = helpReturnTo;
+  });
 
   document.addEventListener("click", e => {
     const go = e.target.closest("[data-go]");

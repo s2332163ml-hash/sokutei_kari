@@ -1,0 +1,58 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /measurements/{measurementId} {
+      allow create: if request.auth != null
+        && request.resource.data.keys().hasAll([
+          'facility', 'pref', 'city', 'use',
+          'length', 'width', 'height', 'position',
+          'result', 'measuredAt', 'createdAt', 'ownerUid'
+        ])
+        && request.resource.data.keys().hasOnly([
+          'facility', 'pref', 'city', 'use',
+          'length', 'width', 'height', 'position',
+          'result', 'measuredAt', 'createdAt', 'ownerUid'
+        ])
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.facility is string
+        && request.resource.data.facility.size() > 0
+        && request.resource.data.facility.size() <= 200
+        && request.resource.data.pref is string
+        && request.resource.data.city is string
+        && request.resource.data.city.size() > 0
+        && request.resource.data.city.size() <= 200
+        && request.resource.data.use is string
+        && request.resource.data.use.size() > 0
+        && request.resource.data.use.size() <= 100
+        && request.resource.data.length is number
+        && request.resource.data.length > 0
+        && request.resource.data.length <= 50
+        && request.resource.data.width is number
+        && request.resource.data.width > 0
+        && request.resource.data.width <= 50
+        && request.resource.data.height is number
+        && request.resource.data.height > 0
+        && request.resource.data.height <= 20
+        && request.resource.data.position is map
+        && request.resource.data.position.keys().hasOnly(['x', 'y'])
+        && request.resource.data.position.keys().hasAll(['x', 'y'])
+        && request.resource.data.position.x is number
+        && request.resource.data.position.y is number
+        && request.resource.data.result is map
+        && request.resource.data.result.keys().hasOnly(['average', 'bands'])
+        && request.resource.data.result.keys().hasAll(['average', 'bands'])
+        && request.resource.data.result.average is number
+        && request.resource.data.result.average >= 0
+        && request.resource.data.result.bands is list
+        && request.resource.data.result.bands.size() > 0
+        && request.resource.data.result.bands.size() <= 12
+        && request.resource.data.measuredAt is string
+        && request.resource.data.createdAt == request.time;
+
+      allow read: if request.auth != null
+        && resource.data.ownerUid == request.auth.uid;
+      allow update, delete: if false;
+    }
+  }
+}

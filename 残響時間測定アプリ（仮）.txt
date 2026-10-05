@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>残響時間測定アプリ</title>
+<style>
+  :root {
+    --bg: #eef3f2;
+    --ink: #12302f;
+    --muted: #5b7573;
+    --accent: #0f766e;
+    --accent-ink: #ffffff;
+    --line: #b9cfcc;
+    --panel: #ffffff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f1f1f;
+      --ink: #e4f1ef;
+      --muted: #8fb0ac;
+      --accent: #2dd4bf;
+      --accent-ink: #062321;
+      --line: #2c4a47;
+      --panel: #162b2a;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Hiragino Sans", "Noto Sans JP", "Yu Gothic", sans-serif;
+  }
+  .screen {
+    display: none;
+    min-height: 100%;
+    flex-direction: column;
+    padding: calc(16px + env(safe-area-inset-top, 0px)) 20px calc(24px + env(safe-area-inset-bottom, 0px));
+    max-width: 480px;
+    margin: 0 auto;
+  }
+  .screen.active { display: flex; }
+  .topbar { display: flex; align-items: center; min-height: 44px; }
+  .topbar .spacer { flex: 1; }
+  .icon-btn {
+    border: 1.5px solid var(--line);
+    background: transparent;
+    color: var(--ink);
+    border-radius: 999px;
+    padding: 8px 16px;
+    font: inherit;
+    font-size: 15px;
+    cursor: pointer;
+  }
+  .icon-btn:hover { border-color: var(--accent); }
+  button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+  /* Home */
+  .home-center {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    gap: 14px;
+    padding-bottom: 40px;
+  }
+  .decay { width: 220px; max-width: 70%; color: var(--accent); }
+  h1 { font-size: 30px; line-height: 1.3; margin: 0 0 20px; font-weight: 700; letter-spacing: .02em; }
+  h2 { font-size: 22px; margin: 0; }
+  .btn {
+    width: 100%;
+    border-radius: 14px;
+    padding: 18px;
+    font: inherit;
+    font-size: 18px;
+    font-weight: 600;
+    cursor: pointer;
+    border: 2px solid var(--accent);
+  }
+  .btn.secondary { background: transparent; color: var(--ink); border-color: var(--line); }
+  .btn.secondary:hover { border-color: var(--accent); }
+  .btn.primary { background: var(--accent); color: var(--accent-ink); }
+  .btn.primary:hover { filter: brightness(1.08); }
+
+  /* Sub screens */
+  .body { flex: 1; padding: 24px 0; display: flex; flex-direction: column; gap: 16px; }
+  .body p { margin: 0; line-height: 1.8; color: var(--muted); }
+  .steps { margin: 0; padding-left: 1.4em; line-height: 1.8; color: var(--muted); }
+  .steps strong { color: var(--ink); }
+  .placeholder {
+    flex: 1;
+    min-height: 220px;
+    border: 2px dashed var(--line);
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 20px;
+    color: var(--muted);
+    background: var(--panel);
+  }
+
+  /* 下部ナビゲーション(戻る・次へ) */
+  .footer { display: flex; gap: 12px; }
+  .footer .btn { padding: 14px; font-size: 16px; }
+  .btn:disabled { opacity: .4; cursor: not-allowed; filter: none; }
+</style>
+</head>
+<body>
+
+<!-- ホーム画面 -->
+<main id="home" class="screen active">
+  <div class="topbar">
+    <div class="spacer"></div>
+    <button class="icon-btn" data-go="help" aria-label="ヘルプを開く">ヘルプ</button>
+  </div>
+  <div class="home-center">
+    <svg class="decay" viewBox="0 0 220 60" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" aria-hidden="true">
+      <path d="M4 6 L22 54 L40 14 L58 48 L76 22 L94 44 L112 28 L130 41 L148 32 L166 39 L184 35 L216 38"/>
+    </svg>
+    <h1>残響時間測定アプリ</h1>
+    <button class="btn secondary" data-go="history">今までの結果</button>
+    <button class="btn primary" data-go="overview">測定を始める</button>
+  </div>
+</main>
+
+<!-- 今までの結果 -->
+<section id="history" class="screen">
+  <div class="topbar">
+    <button class="icon-btn" data-go="home">ホーム</button>
+    <div class="spacer"></div>
+    <button class="icon-btn" data-go="help">ヘルプ</button>
+  </div>
+  <div class="body">
+    <h2>今までの結果</h2>
+    <div class="placeholder">ここに過去の測定結果の一覧を表示します</div>
+  </div>
+  <div class="footer">
+    <button class="btn secondary" data-go="home">戻る</button>
+    <button class="btn primary" disabled>次へ</button>
+  </div>
+</section>
+
+<!-- 測定の概要 -->
+<section id="overview" class="screen">
+  <div class="topbar">
+    <button class="icon-btn" data-go="home">ホーム</button>
+    <div class="spacer"></div>
+    <button class="icon-btn" data-go="help">ヘルプ</button>
+  </div>
+  <div class="body">
+    <h2>当アプリの概要</h2>
+    <p>このアプリは保育施設における残響時間を測定することによって、全国の保育施設の音環境をより良くしていくことを目的に開発されました。以下の手順で進んでいきます。</p>
+    <ol class="steps">
+      <li><strong>準備</strong>:施設名を含む基本情報の入力、また部屋の寸法を入力します。その後、チェックリストや指示に沿って正確な測定に向けた準備を行います。</li>
+      <li><strong>測定</strong>:アプリから音を鳴らして、部屋の響きを記録します。測定中はできるだけ静かにしてください。</li>
+      <li><strong>結果表示</strong>:残響時間が表示され、データをアップロードすることによって結果が保存されます。その他、測定をやり直すことや別の場所で測定を行うことも出来ます。</li>
+    </ol>
+    <p>内容を確認したら「次へ」を押してください。</p>
+  </div>
+  <div class="footer">
+    <button class="btn secondary" data-go="home">戻る</button>
+    <button class="btn primary" data-go="measure">次へ</button>
+  </div>
+</section>
+
+<!-- 測定画面 -->
+<section id="measure" class="screen">
+  <div class="topbar">
+    <button class="icon-btn" data-go="home">ホーム</button>
+    <div class="spacer"></div>
+    <button class="icon-btn" data-go="help">ヘルプ</button>
+  </div>
+  <div class="body">
+    <h2>測定</h2>
+    <div class="placeholder">ここに測定画面を作成します</div>
+  </div>
+  <div class="footer">
+    <button class="btn secondary" data-go="overview">戻る</button>
+    <button class="btn primary" disabled>次へ</button>
+  </div>
+</section>
+
+<!-- ヘルプ(戻る・次へなし) -->
+<section id="help" class="screen">
+  <div class="topbar">
+    <button class="icon-btn" data-go="home">ホーム</button>
+  </div>
+  <div class="body">
+    <h2>ヘルプ</h2>
+    <p>「測定を始める」から残響時間の測定ができます。測定した結果は「今までの結果」で確認できます。</p>
+    <div class="placeholder">ここに詳しい使い方を書きます</div>
+  </div>
+</section>
+
+<script>
+  const screens = ["home", "history", "overview", "measure", "help"];
+
+  function show(id) {
+    if (!screens.includes(id)) id = "home";
+    document.querySelectorAll(".screen").forEach(s => s.classList.toggle("active", s.id === id));
+    window.scrollTo(0, 0);
+  }
+
+  // ボタン押下で画面遷移
+  document.addEventListener("click", e => {
+    const go = e.target.closest("[data-go]");
+    if (go) location.hash = go.dataset.go;
+  });
+
+  window.addEventListener("hashchange", () => show(location.hash.slice(1)));
+  show(location.hash.slice(1));
+</script>
+</body>
+</html>
